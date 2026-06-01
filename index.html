@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Scroll Animation</title>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #071f19;
+      font-family: Arial, sans-serif;
+      touch-action: none;
+    }
+
+    .stage {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+      background: #071f19;
+    }
+
+    canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    .debug {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      color: white;
+      background: rgba(0,0,0,0.4);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+      z-index: 10;
+      display: none;
+    }
+
+    .hint {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: white;
+      font-size: 14px;
+      opacity: 0.75;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    @media (max-width: 768px) {
+      .hint {
+        font-size: 13px;
+        bottom: 22px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="stage">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="debug" id="debug">Loading...</div>
+  <div class="hint">Scroll or swipe to control animation</div>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const debug = document.getElementById("debug");
+
+    const frameCount = 240;
+
+    // كل سكرولة / سوايب = 60 فريم
+    const framesPerStep = 60;
+
+    // مدة تشغيل 60 فريم = ثانيتين
+    const stepDuration = 2000;
+
+    const images = [];
+    let loadedImages = 0;
+
+    let currentFrame = 1;
+    let startFrame = 1;
+    let targetFrame = 1;
+
+    let isPlaying = false;
+    let animationStartTime = 0;
+
+    let touchStartY = 0;
+    let touchEndY = 0;
+    const minSwipeDistance = 40;
+
+    function framePath(index) {
+      const number = String(index).padStart(4, "0");
+
+      // الصور جنب ملف index.html مباشرة
+      return `${number}.webp`;
+    }
+
+    function clampFrame(frame) {
+      return Math.max(1, Math.min(frameCount, frame));
+    }
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      drawFrame(currentFrame);
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+
+    function preloadImages() {
+      for (let i = 1; i <= frameCount; i++) {
+        const img = new Image();
+        img.src = framePath(i);
+
+        img.onload = function () {
+          loadedImages++;
+
+          if (loadedImages === 1) {
+            resizeCanvas();
+            drawFrame(1);
+          }
+
+          debug.textContent =
+            `Loaded: ${loadedImages}/${frameCount}\nCurrent Frame: ${currentFrame}`;
+        };
+
+        img.onerror = function () {
+          console.log("Missing frame:", img.src);
+          debug.textContent = `Missing frame: ${img.src}`;
+        };
+
+        images[i] = img;
+      }
+    }
+
+    function drawFrame(frame) {
+      const safeFrame = clampFrame(Math.round(frame));
+      const img = images[safeFrame];
+
+      if (!img || !img.complete) return;
+
+      const canvasRatio = canvas.width / canvas.height;
+      const imageRatio = img.naturalWidth / img.naturalHeight;
+
+      let drawWidth;
+      let drawHeight;
+      let offsetX;
+      let offsetY;
+
+      // Fullscreen cover زي background-size: cover
+      if (imageRatio > canvasRatio) {
+        drawHeight = canvas.height;
+        drawWidth = drawHeight * imageRatio;
+        offsetX = (canvas.width - drawWidth) / 2;
+        offsetY = 0;
+      } else {
+        drawWidth = canvas.width;
+        drawHeight = drawWidth / imageRatio;
+        offsetX = 0;
+        offsetY = (canvas.height - drawHeight) / 2;
+      }
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+
+      currentFrame = safeFrame;
+
+      debug.textContent =
+        `Loaded: ${loadedImages}/${frameCount}\nCurrent Frame: ${currentFrame}\nTarget Frame: ${targetFrame}\nPlaying: ${isPlaying}`;
+    }
+
+    function startStep(direction) {
+      if (isPlaying) return;
+
+      startFrame = currentFrame;
+      targetFrame = clampFrame(currentFrame + direction * framesPerStep);
+
+      if (targetFrame === currentFrame) return;
+
+      animationStartTime = performance.now();
+      isPlaying = true;
+    }
+
+    // Desktop mouse wheel
+    window.addEventListener("wheel", function (e) {
+      e.preventDefault();
+
+      const direction = e.deltaY > 0 ? 1 : -1;
+      startStep(direction);
+
+    }, { passive: false });
+
+    // Mobile touch start
+    window.addEventListener("touchstart", function (e) {
+      if (!e.touches || e.touches.length === 0) return;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: false });
+
+    // منع سكرول الصفحة الطبيعي على الموبايل
+    window.addEventListener("touchmove", function (e) {
+      e.preventDefault();
+    }, { passive: false });
+
+    // Mobile swipe end
+    window.addEventListener("touchend", function (e) {
+      if (!e.changedTouches || e.changedTouches.length === 0) return;
+
+      touchEndY = e.changedTouches[0].clientY;
+
+      const diff = touchStartY - touchEndY;
+
+      if (Math.abs(diff) < minSwipeDistance) return;
+
+      // Swipe up = forward
+      // Swipe down = backward
+      const direction = diff > 0 ? 1 : -1;
+
+      startStep(direction);
+
+    }, { passive: false });
+
+    function animate(now) {
+      if (isPlaying) {
+        const elapsed = now - animationStartTime;
+        const progress = Math.min(elapsed / stepDuration, 1);
+
+        // Linear ثابت: لا تسريع ولا تبطيء
+        const frame = startFrame + (targetFrame - startFrame) * progress;
+
+        drawFrame(frame);
+
+        if (progress >= 1) {
+          isPlaying = false;
+          currentFrame = targetFrame;
+          drawFrame(currentFrame);
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    preloadImages();
+    requestAnimationFrame(animate);
+  </script>
+
+</body>
+</html>
