@@ -120,6 +120,9 @@
     }
 
     window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("orientationchange", function () {
+      setTimeout(resizeCanvas, 250);
+    });
 
     function preloadImages() {
       for (let i = 1; i <= frameCount; i++) {
@@ -156,22 +159,48 @@
       const canvasRatio = canvas.width / canvas.height;
       const imageRatio = img.naturalWidth / img.naturalHeight;
 
+      const isMobilePortrait =
+        window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
+
       let drawWidth;
       let drawHeight;
       let offsetX;
       let offsetY;
 
-      // Fullscreen cover زي background-size: cover
-      if (imageRatio > canvasRatio) {
-        drawHeight = canvas.height;
-        drawWidth = drawHeight * imageRatio;
-        offsetX = (canvas.width - drawWidth) / 2;
-        offsetY = 0;
+      if (isMobilePortrait) {
+        /*
+          Mobile Portrait:
+          الصورة تظهر كاملة بدون قص
+          زي background-size: contain
+        */
+        if (imageRatio > canvasRatio) {
+          drawWidth = canvas.width;
+          drawHeight = drawWidth / imageRatio;
+          offsetX = 0;
+          offsetY = (canvas.height - drawHeight) / 2;
+        } else {
+          drawHeight = canvas.height;
+          drawWidth = drawHeight * imageRatio;
+          offsetX = (canvas.width - drawWidth) / 2;
+          offsetY = 0;
+        }
       } else {
-        drawWidth = canvas.width;
-        drawHeight = drawWidth / imageRatio;
-        offsetX = 0;
-        offsetY = (canvas.height - drawHeight) / 2;
+        /*
+          Desktop / Landscape:
+          الصورة تملأ الشاشة
+          زي background-size: cover
+        */
+        if (imageRatio > canvasRatio) {
+          drawHeight = canvas.height;
+          drawWidth = drawHeight * imageRatio;
+          offsetX = (canvas.width - drawWidth) / 2;
+          offsetY = 0;
+        } else {
+          drawWidth = canvas.width;
+          drawHeight = drawWidth / imageRatio;
+          offsetX = 0;
+          offsetY = (canvas.height - drawHeight) / 2;
+        }
       }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
