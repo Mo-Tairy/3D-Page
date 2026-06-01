@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fixed 60 Frames Per Wheel Scroll</title>
+  <title>3D Scroll Animation</title>
 
   <style>
     html, body {
@@ -14,6 +14,7 @@
       overflow: hidden;
       background: #071f19;
       font-family: Arial, sans-serif;
+      touch-action: none;
     }
 
     .stage {
@@ -41,6 +42,7 @@
       font-size: 13px;
       line-height: 1.5;
       z-index: 10;
+      display: none;
     }
 
     .hint {
@@ -49,10 +51,17 @@
       left: 50%;
       transform: translateX(-50%);
       color: white;
-      font-size: 15px;
-      opacity: 0.8;
+      font-size: 14px;
+      opacity: 0.75;
       pointer-events: none;
       z-index: 10;
+    }
+
+    @media (max-width: 768px) {
+      .hint {
+        font-size: 13px;
+        bottom: 22px;
+      }
     }
   </style>
 </head>
@@ -64,7 +73,7 @@
   </div>
 
   <div class="debug" id="debug">Loading...</div>
-  <div class="hint">Each mouse wheel step plays 60 frames in exactly 2 seconds</div>
+  <div class="hint">Scroll or swipe to control animation</div>
 
   <script>
     const canvas = document.getElementById("canvas");
@@ -73,10 +82,10 @@
 
     const frameCount = 240;
 
-    // كل لفة عجلة = 60 فريم
-    const framesPerWheel = 60;
+    // كل سكرولة / سوايب = 60 فريم
+    const framesPerStep = 60;
 
-    // مدة تشغيل الـ 60 فريم = ثانيتين
+    // مدة تشغيل 60 فريم = ثانيتين
     const stepDuration = 2000;
 
     const images = [];
@@ -89,8 +98,14 @@
     let isPlaying = false;
     let animationStartTime = 0;
 
+    let touchStartY = 0;
+    let touchEndY = 0;
+    const minSwipeDistance = 40;
+
     function framePath(index) {
       const number = String(index).padStart(4, "0");
+
+      // الصور جنب ملف index.html مباشرة
       return `${number}.webp`;
     }
 
@@ -146,7 +161,7 @@
       let offsetX;
       let offsetY;
 
-      // Cover mode زي background-size: cover
+      // Fullscreen cover زي background-size: cover
       if (imageRatio > canvasRatio) {
         drawHeight = canvas.height;
         drawWidth = drawHeight * imageRatio;
@@ -172,7 +187,7 @@
       if (isPlaying) return;
 
       startFrame = currentFrame;
-      targetFrame = clampFrame(currentFrame + direction * framesPerWheel);
+      targetFrame = clampFrame(currentFrame + direction * framesPerStep);
 
       if (targetFrame === currentFrame) return;
 
@@ -180,10 +195,40 @@
       isPlaying = true;
     }
 
+    // Desktop mouse wheel
     window.addEventListener("wheel", function (e) {
       e.preventDefault();
 
       const direction = e.deltaY > 0 ? 1 : -1;
+      startStep(direction);
+
+    }, { passive: false });
+
+    // Mobile touch start
+    window.addEventListener("touchstart", function (e) {
+      if (!e.touches || e.touches.length === 0) return;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: false });
+
+    // منع سكرول الصفحة الطبيعي على الموبايل
+    window.addEventListener("touchmove", function (e) {
+      e.preventDefault();
+    }, { passive: false });
+
+    // Mobile swipe end
+    window.addEventListener("touchend", function (e) {
+      if (!e.changedTouches || e.changedTouches.length === 0) return;
+
+      touchEndY = e.changedTouches[0].clientY;
+
+      const diff = touchStartY - touchEndY;
+
+      if (Math.abs(diff) < minSwipeDistance) return;
+
+      // Swipe up = forward
+      // Swipe down = backward
+      const direction = diff > 0 ? 1 : -1;
+
       startStep(direction);
 
     }, { passive: false });
